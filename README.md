@@ -67,6 +67,23 @@ npm install
 docker compose up -d
 ```
 
+### Windows Docker Setup
+
+If `docker` is not recognized on Windows, install Docker Desktop and enable the required WSL features. Open PowerShell as Administrator and run:
+
+```powershell
+wsl --install --no-distribution
+```
+
+Restart Windows, install Docker Desktop, open it once and wait until it shows that Docker is running. Then verify:
+
+```powershell
+docker --version
+docker compose version
+```
+
+If WSL2 still reports that virtualization is unavailable, enable virtualization in BIOS/UEFI, usually named Intel VT-x, Intel Virtualization Technology, AMD-V or SVM.
+
 ## Initialize And Seed The Database
 
 The `init:db` script creates the required table and inserts 10 trip requests. It can be executed multiple times.
