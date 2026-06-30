@@ -28,3 +28,12 @@ export interface Holiday {
   name: string;
   type: string;
 }
+
+export interface TripRequestFilters {
+  status?: TripRequestStatus;
+  origin?: string;
+  destination?: string;
+  requesterName?: string;
+  departureFrom?: string;
+  departureTo?: string;
+}

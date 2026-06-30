@@ -1,6 +1,6 @@
 import { AppError } from "../errors/app-error.js";
 import { TripRequestRepository } from "../repositories/trip-request-repository.js";
-import { CreateTripRequestInput, TripRequest } from "../types.js";
+import { CreateTripRequestInput, TripRequest, TripRequestFilters } from "../types.js";
 import { HolidaysClient } from "./holidays-client.js";
 
 export class TripRequestService {
@@ -44,8 +44,9 @@ export class TripRequestService {
     });
   }
 
-  async findAll(): Promise<TripRequest[]> {
-    return this.repository.findAll();
+  async findAll(query: unknown = {}): Promise<TripRequest[]> {
+    const filters = this.validateFilters(query);
+    return this.repository.findAll(filters);
   }
 
   async findById(id: string): Promise<TripRequest> {
@@ -122,6 +123,63 @@ export class TripRequestService {
       purpose: getTextField("purpose").trim(),
       passengerCount: payload.passengerCount,
     };
+  }
+
+  private validateFilters(query: unknown): TripRequestFilters {
+    if (!query || typeof query !== "object") {
+      return {};
+    }
+
+    const payload = query as Record<string, unknown>;
+    const filters: TripRequestFilters = {};
+
+    if (payload.status !== undefined) {
+      if (payload.status !== "pending" && payload.status !== "canceled") {
+        throw new AppError(400, "VALIDATION_ERROR", "status must be pending or canceled");
+      }
+
+      filters.status = payload.status;
+    }
+
+    for (const field of ["origin", "destination", "requesterName"] as const) {
+      if (payload[field] !== undefined) {
+        if (typeof payload[field] !== "string" || payload[field].trim().length === 0) {
+          throw new AppError(400, "VALIDATION_ERROR", `${field} filter must be a text value`);
+        }
+
+        filters[field] = payload[field].trim();
+      }
+    }
+
+    if (payload.departureFrom !== undefined) {
+      if (typeof payload.departureFrom !== "string") {
+        throw new AppError(400, "VALIDATION_ERROR", "departureFrom must be a valid ISO 8601 date");
+      }
+
+      filters.departureFrom = this.normalizeDate(payload.departureFrom, "departureFrom");
+    }
+
+    if (payload.departureTo !== undefined) {
+      if (typeof payload.departureTo !== "string") {
+        throw new AppError(400, "VALIDATION_ERROR", "departureTo must be a valid ISO 8601 date");
+      }
+
+      filters.departureTo = this.normalizeDate(payload.departureTo, "departureTo");
+    }
+
+    if (
+      filters.departureFrom &&
+      filters.departureTo &&
+      new Date(filters.departureTo).getTime() < new Date(filters.departureFrom).getTime()
+    ) {
+      throw new AppError(
+        400,
+        "VALIDATION_ERROR",
+        "departureTo must be greater than or equal to departureFrom",
+      );
+    }
+
+    return filters;
   }
 
   private normalizeDate(value: string, fieldName: string): string {

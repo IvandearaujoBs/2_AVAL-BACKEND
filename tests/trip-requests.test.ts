@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { TripRequestRepository } from "../src/repositories/trip-request-repository.js";
 import { HolidaysClient } from "../src/services/holidays-client.js";
-import { Holiday, TripRequest, TripRequestStatus } from "../src/types.js";
+import { Holiday, TripRequest, TripRequestFilters, TripRequestStatus } from "../src/types.js";
 
 class InMemoryTripRequestRepository implements TripRequestRepository {
   private tripRequests: TripRequest[] = [];
@@ -20,8 +20,32 @@ class InMemoryTripRequestRepository implements TripRequestRepository {
     return tripRequest;
   }
 
-  async findAll(): Promise<TripRequest[]> {
-    return [...this.tripRequests];
+  async findAll(filters: TripRequestFilters = {}): Promise<TripRequest[]> {
+    return this.tripRequests.filter((tripRequest) => {
+      const matchesStatus = !filters.status || tripRequest.status === filters.status;
+      const matchesOrigin =
+        !filters.origin ||
+        tripRequest.origin.toLowerCase().includes(filters.origin.toLowerCase());
+      const matchesDestination =
+        !filters.destination ||
+        tripRequest.destination.toLowerCase().includes(filters.destination.toLowerCase());
+      const matchesRequesterName =
+        !filters.requesterName ||
+        tripRequest.requesterName.toLowerCase().includes(filters.requesterName.toLowerCase());
+      const matchesDepartureFrom =
+        !filters.departureFrom || tripRequest.departureAt >= filters.departureFrom;
+      const matchesDepartureTo =
+        !filters.departureTo || tripRequest.departureAt <= filters.departureTo;
+
+      return (
+        matchesStatus &&
+        matchesOrigin &&
+        matchesDestination &&
+        matchesRequesterName &&
+        matchesDepartureFrom &&
+        matchesDepartureTo
+      );
+    });
   }
 
   async findById(id: string): Promise<TripRequest | null> {
@@ -167,5 +191,37 @@ describe("trip requests", () => {
 
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("TRIP_REQUEST_ALREADY_CANCELED");
+  });
+
+  it("filters trip requests by status and destination", async () => {
+    await request(testContext.app).post("/trip-requests").send(validBody);
+    await request(testContext.app)
+      .post("/trip-requests")
+      .send({
+        ...validBody,
+        requesterName: "Carlos Pereira",
+        destination: "Picos",
+        departureAt: "2026-07-02T11:00:00.000Z",
+        returnAt: "2026-07-02T18:00:00.000Z",
+      });
+
+    const response = await request(testContext.app).get(
+      "/trip-requests?status=pending&destination=Picos",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0]).toMatchObject({
+      requesterName: "Carlos Pereira",
+      destination: "Picos",
+      status: "pending",
+    });
+  });
+
+  it("rejects invalid filters with a standardized error", async () => {
+    const response = await request(testContext.app).get("/trip-requests?status=approved");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
   });
 });

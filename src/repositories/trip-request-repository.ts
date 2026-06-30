@@ -1,9 +1,9 @@
 import { Pool } from "pg";
-import { TripRequest, TripRequestStatus } from "../types.js";
+import { TripRequest, TripRequestFilters, TripRequestStatus } from "../types.js";
 
 export interface TripRequestRepository {
   create(input: Omit<TripRequest, "id">): Promise<TripRequest>;
-  findAll(): Promise<TripRequest[]>;
+  findAll(filters?: TripRequestFilters): Promise<TripRequest[]>;
   findById(id: string): Promise<TripRequest | null>;
   updateStatus(id: string, status: TripRequestStatus): Promise<TripRequest | null>;
 }
@@ -48,11 +48,46 @@ export class PostgresTripRequestRepository implements TripRequestRepository {
     return toTripRequest(result.rows[0]);
   }
 
-  async findAll(): Promise<TripRequest[]> {
+  async findAll(filters: TripRequestFilters = {}): Promise<TripRequest[]> {
+    const conditions: string[] = [];
+    const values: string[] = [];
+
+    const addValue = (value: string) => {
+      values.push(value);
+      return `$${values.length}`;
+    };
+
+    if (filters.status) {
+      conditions.push(`status = ${addValue(filters.status)}`);
+    }
+
+    if (filters.origin) {
+      conditions.push(`origin ILIKE ${addValue(`%${filters.origin}%`)}`);
+    }
+
+    if (filters.destination) {
+      conditions.push(`destination ILIKE ${addValue(`%${filters.destination}%`)}`);
+    }
+
+    if (filters.requesterName) {
+      conditions.push(`requester_name ILIKE ${addValue(`%${filters.requesterName}%`)}`);
+    }
+
+    if (filters.departureFrom) {
+      conditions.push(`departure_at >= ${addValue(filters.departureFrom)}`);
+    }
+
+    if (filters.departureTo) {
+      conditions.push(`departure_at <= ${addValue(filters.departureTo)}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const result = await this.pool.query(
       `SELECT id, requester_name, origin, destination, departure_at, return_at, purpose, passenger_count, status, created_at
        FROM trip_requests
+       ${whereClause}
        ORDER BY created_at DESC, id DESC`,
+      values,
     );
 
     return result.rows.map(toTripRequest);

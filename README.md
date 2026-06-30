@@ -184,6 +184,21 @@ Lists all registered trip requests.
 
 Success status: `200 OK`
 
+Optional query filters:
+
+- `status`: `pending` or `canceled`
+- `origin`: partial city name
+- `destination`: partial city name
+- `requesterName`: partial requester name
+- `departureFrom`: ISO 8601 date lower bound
+- `departureTo`: ISO 8601 date upper bound
+
+Example:
+
+```text
+GET /trip-requests?status=pending&destination=Teresina&departureFrom=2026-06-01T00:00:00.000Z
+```
+
 ### `GET /trip-requests/:id`
 
 Retrieves one trip request by id.

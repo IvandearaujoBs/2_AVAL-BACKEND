@@ -14,9 +14,9 @@ export function createTripRequestRoutes(tripRequestService: TripRequestService) 
     }
   });
 
-  router.get("/trip-requests", async (_request, response, next) => {
+  router.get("/trip-requests", async (request, response, next) => {
     try {
-      const tripRequests = await tripRequestService.findAll();
+      const tripRequests = await tripRequestService.findAll(request.query);
       return sendSuccess(response, 200, tripRequests);
     } catch (error) {
       return next(error);
